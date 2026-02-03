@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Doña Muñeca - Gestión Residencial</title>
+	<link rel="manifest" href="manifest.json">
+		<meta name="theme-color" content="#2c3e50">
+    <link rel="stylesheet" href="style.css">
+    <script src="libs/chart.js"></script>
+    <script src="libs/xlsx.full.min.js"></script>
+    <script src="libs/jspdf.js"></script>
+</head>
+<body>
+    <div id="splash-screen" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10000; transition: all 0.5s ease;">
+        <img src="logo.jpg" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #eee;">
+        <h2 style="margin-top: 15px; color: #333; font-family: sans-serif;">Doña Muñeca</h2>
+        <div style="width: 200px; height: 6px; background: #eee; border-radius: 10px; margin: 20px 0; overflow: hidden;">
+            <div id="loader-bar" style="width: 0%; height: 100%; background: #2980b9; transition: width 0.1s;"></div>
+        </div>
+        <p style="color: #888; font-family: sans-serif; font-size: 14px;">Iniciando sistema...</p>
+    </div>
+
+    <div class="container">
+        <nav class="sidebar">
+            <div class="logo-area">
+                <img src="logo.jpg" alt="Logo" class="logo-circle">
+                <h2>Doña Muñeca</h2>
+                <small>Gestión Profesional</small>
+            </div>
+            <ul>
+                <li onclick="showSection('dashboard')">📊 Dashboard</li>
+                <li onclick="showSection('residents')">👥 Residentes</li>
+                <li onclick="showSection('payments')">💰 Control de Pagos</li>
+                <li onclick="showSection('expenses')">📉 Gastos Operativos</li>
+                <li onclick="showSection('settings')">⚙️ Configuración</li>
+				<li onclick="showSection('help')">❓ Ayuda / Manual</li>
+            </ul>
+        </nav>
+
+        <main class="content">
+            <div id="top-bar" style="display: flex; justify-content: flex-end; padding: 10px; margin-bottom: 20px; font-weight: bold; color: #2c3e50; border-bottom: 1px solid #eee;">
+                <span id="live-clock">Cargando fecha y hora...</span>
+            </div>
+
+            <section id="dashboard" class="active">
+    <h1>Resumen Mensual</h1>
+    
+    <div class="stats-grid">
+        <div class="card">
+            <h3>Residentes Activos</h3>
+            <p id="count-residents">0</p>
+        </div>
+        
+        <div class="card" id="birthday-card" style="border: 2px solid #f1c40f; display: none; background: #fffdf0;">
+            <h3 style="color: #d35400;">🎂 Cumpleaños</h3>
+            <p id="birthday-list" style="font-size: 0.9rem; margin-top:10px;"></p>
+        </div>
+    </div>
+
+    <div class="finance-group-container">
+        <h3 class="group-title">💰 Estado Financiero del Mes</h3>
+        <div class="stats-grid financial-grid">
+            <div class="card income-card">
+                <h3>Ingresos</h3>
+                <p id="total-income">$ 0</p>
+            </div>
+            <div class="card expense-card">
+                <h3>Gastos</h3>
+                <p id="total-expenses">$ 0</p>
+            </div>
+            <div class="card balance-card">
+                <h3>Balance Neto</h3>
+                <p id="net-balance">$ 0</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card" style="max-width: 800px; margin: 20px auto;">
+        <h3 style="margin-bottom: 15px;">Evolución de Finanzas (Semestral)</h3>
+        <div style="height: 300px;"><canvas id="financeChart"></canvas></div>
+    </div>
+</section>
+
+            <section id="residents">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h1>Base de Datos de Residentes</h1>
+                    <button class="btn-primary" onclick="openModal('residentModal')">+ Nueva Ficha</button>
+                </div>
+                <input type="text" id="searchResident" placeholder="🔍 Buscar por nombre o CI..." onkeyup="filterResidents()" style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                <table>
+                    <thead><tr><th>Residente / CI</th><th>Emergencia Movil</th><th>Ficha</th><th>Estado</th><th>Acciones</th></tr></thead>
+                    <tbody id="residentsBody"></tbody>
+                </table>
+            </section>
+
+            <section id="payments">
+                <h1>Gestión de Cobros</h1>
+                <h3>Pendientes de Pago (Mes Actual)</h3>
+                <table>
+                    <thead>
+						<tr>
+							<th>Residente / CI</th>
+							<th>Estado</th>
+						</tr>
+					</thead>
+                    <tbody id="debtorsBody"></tbody>
+                </table>
+                <h3 style="margin-top:30px">Historial de Pagos</h3>
+                <table>
+                    <thead><tr><th>Residente</th><th>Monto</th><th>Fecha Registro</th><th>Acciones</th></tr></thead>
+                    <tbody id="paymentsHistoryBody"></tbody>
+                </table>
+            </section>
+
+            <section id="expenses">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h1>Gastos Operativos</h1>
+                    <button class="btn-primary" onclick="openModal('expenseModal')">+ Registrar Gasto</button>
+                </div>
+                <table>
+                    <thead><tr><th>Concepto</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
+                    <tbody id="expensesBody"></tbody>
+                </table>
+            </section>
+
+            <section id="settings">
+                <h1>Administración y Backups</h1>
+                <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="card">
+                        <h3>Reportes PDF</h3>
+                        <button class="btn-primary" style="background:var(--dark); width: 100%;" onclick="cerrarMes()">🔒 Generar Cierre de Mes</button>
+                    </div>
+                    <div class="card">
+                        <h3>Copia de Seguridad (JSON)</h3>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <button class="btn-primary" onclick="exportBackupJSON()">📤 Exportar Backup</button>
+                            <button class="btn-primary" style="background: var(--secondary);" onclick="document.getElementById('importFile').click()">📥 Importar Backup</button>
+                            <input type="file" id="importFile" style="display:none" accept=".json" onchange="importBackupJSON(event)">
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:20px"><button onclick="exportToExcel()">📊 Descargar Excel de Residentes</button></div>
+            </section>
+			<section id="help" style="max-width: 800px; margin: 0 auto; font-family: sans-serif; padding: 20px;">
+    
+    <header style="border-bottom: 1px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 30px;">
+        <h2 style="font-size: 1.1rem; font-weight: 400; color: #1a202c; margin: 0; letter-spacing: 0.5px;">Manual de Usuario</h2>
+        <span style="font-size: 0.7rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 1px;">Instrucciones Operativas · Doña Muñeca</span>
+    </header>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+        
+        <div style="margin-bottom: 25px;">
+            <h4 style="font-size: 0.8rem; font-weight: 600; color: #4a5568; margin-bottom: 10px; text-transform: uppercase;">Administración</h4>
+            <p style="font-size: 0.8rem; line-height: 1.5; color: #718096; margin: 0;">
+                El <b>Dashboard</b> visualiza el balance neto mensual. Los montos se actualizan automáticamente al ingresar pagos de residentes o gastos de mantenimiento.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <h4 style="font-size: 0.8rem; font-weight: 600; color: #4a5568; margin-bottom: 10px; text-transform: uppercase;">Residentes</h4>
+            <p style="font-size: 0.8rem; line-height: 1.5; color: #718096; margin: 0;">
+                La columna <b>Emergencia Móvil</b> es prioritaria. Use el botón "Resumen" para consultar datos médicos rápidamente sin riesgo de modificar la ficha.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <h4 style="font-size: 0.8rem; font-weight: 600; color: #4a5568; margin-bottom: 10px; text-transform: uppercase;">Pagos y Gastos</h4>
+            <p style="font-size: 0.8rem; line-height: 1.5; color: #718096; margin: 0;">
+                No utilice puntos ni comas al ingresar dinero. El sistema aplica el formato <b>$ 0.000</b> automáticamente para facilitar la lectura contable.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <h4 style="font-size: 0.8rem; font-weight: 600; color: #4a5568; margin-bottom: 10px; text-transform: uppercase;">Seguridad</h4>
+            <p style="font-size: 0.8rem; line-height: 1.5; color: #718096; margin: 0;">
+                Se recomienda exportar un <b>Backup</b> semanalmente desde la configuración. Esto garantiza que sus datos estén a salvo ante cualquier eventualidad.
+            </p>
+        </div>
+
+    </div>
+
+    <div style="margin-top: 40px; padding: 15px; border-radius: 8px; background-color: #f7fafc; border: 1px solid #edf2f7; text-align: center;">
+        <p style="font-size: 0.75rem; color: #a0aec0; margin: 0; font-style: italic;">
+            Tip: Escriba el nombre de la mutualista en el buscador para filtrar residentes rápidamente.
+        </p>
+    </div>
+</section>
+</section>
+        </main>
+    </div>
+<div id="viewResidentModal" class="modal">
+    <div class="modal-content" style="max-width: 600px; border-top: 8px solid #2980b9;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h2 id="vName" style="color: #2c3e50; margin-bottom: 5px;"></h2>
+            <span id="vStatus" class="status-badge"></span>
+        </div>
+        <p style="color: #7f8c8d; margin-bottom: 20px;">CI: <span id="vCedula"></span></p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="grid-column: span 2; background: #fff5f5; padding: 15px; border-radius: 8px; border: 1px solid #feb2b2;">
+                <h4 style="color: #c53030; margin-bottom: 8px;">🚑 EMERGENCIA MÓVIL</h4>
+                <p style="font-size: 1.2rem; font-weight: bold;" id="vEmergencia"></p>
+            </div>
+
+            <div>
+                <h4 style="color: #7f8c8d; font-size: 0.8rem; text-transform: uppercase;">📅 Nacimiento</h4>
+                <p id="vBirth" style="font-weight: 500;"></p>
+            </div>
+            <div>
+                <h4 style="color: #7f8c8d; font-size: 0.8rem; text-transform: uppercase;">🚀 Ingreso</h4>
+                <p id="vEntry" style="font-weight: 500;"></p>
+            </div>
+
+            <div style="grid-column: span 2; background: #f8fafc; padding: 15px; border-radius: 8px;">
+                <h4 style="color: #475569; margin-bottom: 8px;">📞 Contacto Familiar</h4>
+                <p id="vFamiliar" style="font-weight: 500;"></p>
+                <p id="vFamiliarTel" style="font-size: 1.1rem; font-weight: bold; color: #2980b9;"></p>
+            </div>
+
+            <div style="grid-column: span 2;">
+                <h4 style="color: #7f8c8d; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 8px;">📝 Ficha Médica</h4>
+                <div id="vMedical" style="background: #fff; border: 1px solid #eee; padding: 10px; border-radius: 5px; min-height: 80px; white-space: pre-wrap;"></div>
+            </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 25px; text-align: right;">
+            <button onclick="closeModal('viewResidentModal')" class="btn-primary">Entendido</button>
+        </div>
+    </div>
+</div>
+    <div id="residentModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">Ficha del Residente</h3>
+        <input type="hidden" id="isEdit" value="false">
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+            <div>
+                <label>CI / Cédula:</label><input type="text" id="resCedula">
+                <label>Nombre Completo:</label><input type="text" id="resName">
+                <label>Fecha Nacimiento:</label><input type="date" id="resBirthDate">
+                <label>Fecha Ingreso:</label><input type="date" id="resEntryDate">
+                
+                <div style="margin-top: 20px; padding: 15px; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px;">
+                    <label style="color: #c53030; font-weight: bold; margin-bottom: 5px; display: block;">🚑 EMERGENCIA MÓVIL:</label>
+                    <input type="text" id="resEmergenciaMovilNombre" placeholder="Nombre (Ej: SEMM, UCM)">
+                    <input type="text" id="resEmergenciaMovilTel" placeholder="Teléfono de Urgencia">
+                </div>
+                
+                <label style="margin-top: 15px;">Estado:</label>
+                <select id="resStatus">
+                    <option value="Activo">Activo</option>
+                    <option value="Baja">Baja</option>
+                </select>
+            </div>
+
+            <div>
+                <fieldset style="padding:15px; border-radius:8px; border:1px solid #ddd; margin-bottom: 15px;">
+                    <legend style="padding: 0 10px; font-weight: bold; color: #2c3e50;">📞 Familiar de Contacto</legend>
+                    <input type="text" id="resEmerName" placeholder="Nombre Familiar">
+                    <input type="text" id="resEmerPhone" placeholder="Teléfono">
+                    <input type="text" id="resEmerNote" placeholder="Parentesco / Nota">
+                </fieldset>
+
+                <label>Ficha Médica y Cuidados:</label>
+                <textarea id="resMedical" rows="8" placeholder="Alergias, medicación, observaciones generales..." style="width: 100%; resize: vertical;"></textarea>
+            </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="saveResident()" class="btn-primary" style="background: #27ae60;">Guardar Cambios</button>
+            <button onclick="closeModal('residentModal')" class="btn-secondary">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+    <div id="paymentModal" class="modal"><div class="modal-content">
+        <h3>Registrar Cobro</h3><p id="payResidentName"></p>
+        <input type="hidden" id="payResidentId">
+        <label>Monto ($):</label><input type="text" id="payAmount" oninput="formatCurrencyInput(event)">
+        <div class="modal-actions"><button onclick="processPayment()" class="btn-primary">Confirmar</button><button onclick="closeModal('paymentModal')">Cancelar</button></div>
+    </div></div>
+
+    <div id="editPaymentModal" class="modal"><div class="modal-content">
+        <h3>Editar Pago</h3><input type="hidden" id="editPayId">
+        <label>Nuevo Monto ($):</label><input type="text" id="editPayAmount" oninput="formatCurrencyInput(event)">
+        <div class="modal-actions"><button onclick="saveEditedPayment()" class="btn-primary">Actualizar</button><button onclick="closeModal('editPaymentModal')">Cerrar</button></div>
+    </div></div>
+
+    <div id="expenseModal" class="modal"><div class="modal-content">
+        <h3>Registrar Gasto</h3>
+		<label>Categoría:</label>
+			<select id="expenseCategory" style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ccc;">
+				<option value="Alimentos">Alimentos</option>
+				<option value="Sueldos">Sueldos / Honorarios</option>
+				<option value="Servicios">Servicios (Luz, Agua, Gas)</option>
+				<option value="Medicamentos">Medicamentos / Salud</option>
+				<option value="Mantenimiento">Mantenimiento / Limpieza</option>
+				<option value="Otros">Otros</option>
+			</select>
+        <label>Concepto:</label><input type="text" id="expConcept">
+        <label>Monto ($):</label><input type="text" id="expAmount" oninput="formatCurrencyInput(event)">
+        <div class="modal-actions"><button onclick="saveExpense()" class="btn-primary">Guardar</button><button onclick="closeModal('expenseModal')">Cerrar</button></div>
+    </div></div>
+
+    <script src="js/db.js"></script>
+    <script src="js/residents.js"></script>
+    <script src="js/finance.js"></script>
+    <script src="js/app.js"></script>
+
+    <script>
+        // Funciones de control de la UI (Copia fiel)
+        function openModal(id) { document.getElementById(id).style.display = 'block'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function openPaymentModal(cedula, name) {
+            document.getElementById('payResidentId').value = cedula;
+            document.getElementById('payResidentName').innerText = "Residente: " + name;
+            openModal('paymentModal');
+        }
+        async function processPayment() {
+            const ci = document.getElementById('payResidentId').value;
+            const monto = document.getElementById('payAmount').value;
+            if(!monto) return alert("Ingrese monto");
+            await addPayment(ci, monto);
+            closeModal('paymentModal');
+            refreshAllData();
+            document.getElementById('payAmount').value = "";
+        }
+        async function saveExpense() {
+            const concept = document.getElementById('expConcept').value;
+            const amount = document.getElementById('expAmount').value;
+            if(!concept || !amount) return alert("Complete datos");
+            await addExpense(concept, amount);
+            closeModal('expenseModal');
+            refreshAllData();
+            document.getElementById('expConcept').value = "";
+            document.getElementById('expAmount').value = "";
+        }
+    </script>
+</body>
+</html>
