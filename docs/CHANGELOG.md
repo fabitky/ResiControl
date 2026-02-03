@@ -1,32 +1,30 @@
-# 馃摑 Registro de Cambios (Changelog) - Residencial Do帽a Mu帽eca
+# ?? Registro de Cambios (Changelog) - Residencial Do?a Mu?eca
 
-Todos los cambios notables en este proyecto ser谩n documentados en este archivo.
+Todos los cambios notables en este proyecto serán documentados en este archivo.
 
-## [1.2.0] - 2026-02-02
-### A帽adido
-- **Categorizaci贸n de Gastos:** Nuevo sistema para clasificar egresos (Sueldos, Alimentos, Alquiler, etc.).
-- **Ficha M茅dica PDF:** Generaci贸n de ficha individual por residente con datos de emergencia y mutualista.
-- **Respaldo de Datos:** Implementaci贸n de funciones de Exportar/Importar JSON para copias de seguridad.
-- **Est茅tica Profesional:** Refinamiento de la interfaz con dise帽o responsivo y tipograf铆a moderna.
+## [1.6.0] - 2026-02-03 (Actual)
+### A?adido
+- **Selector de Mes para Reportes:** Se incorporó un calendario interactivo (`input type="month"`) que permite elegir exactamente qué mes cerrar, facilitando la generación de reportes históricos.
+- **Respaldo Total de Datos:** El sistema de Backup JSON ahora incluye la tabla de **Gastos**, asegurando que no se pierda información financiera al exportar o importar datos.
 
 ### Mejorado
-- **Reporte Mensual:** Ahora el PDF agrupa autom谩ticamente los gastos por categor铆as y calcula balances netos.
-- **Validaci贸n Financiera:** Mejora en el procesamiento de n煤meros para evitar errores de coma y punto decimal.
+- **Integridad de Base de Datos:** La función de importación ahora realiza una limpieza profunda y reasignación de IDs para evitar conflictos y asegurar que los cobros y gastos se vinculen correctamente tras una restauración.
 
-## [1.1.0] - 2026-01-20
-### A帽adido
-- **M贸dulo de Finanzas:** Creaci贸n de las tablas de pagos de mensualidades y gastos operativos.
-- **Integraci贸n jsPDF:** Primera versi贸n de los reportes descargables en formato PDF.
-- **Dashboard Din谩mico:** Resumen autom谩tico de ingresos y egresos en la pantalla principal.
+## [1.5.0] - 2026-02-03
+### A?adido
+- **Redise?o de Ficha PDF:** Estética profesional con bordes de sección y fondos sutiles.
+- **Cálculo Automático de Edad:** El PDF calcula los a?os del residente en tiempo real según su fecha de nacimiento.
+- **Campos Corregidos:** Se vincularon correctamente los datos de contacto familiar (`emerName`, `emerPhone`) y el historial médico (`medical`) en el documento impreso.
 
-## [1.0.0] - 2026-01-05
-### A帽adido
-- **Lanzamiento Inicial:** Estructura base de la aplicaci贸n (HTML/CSS/JS).
-- **Persistencia Local:** Configuraci贸n de la base de datos IndexedDB para funcionamiento offline.
-- **Gesti贸n de Residentes:** CRUD b谩sico para altas, bajas y modificaciones de residentes.
-- **Seguridad:** Implementaci贸n de almacenamiento 100% privado en el lado del cliente.
+## [1.4.0] - 2026-02-03
+### A?adido
+- **Ordenamiento de Historial:** Capacidad de ordenar la lista de pagos por nombre de residente o por fecha.
+- **Edición de Fechas:** Ahora se puede modificar la fecha de un pago ya registrado desde el modal de edición.
 
----
+## [1.3.0] - 2026-02-03
+### A?adido
+- **Flexibilidad de Fechas:** Selector de calendario para ingresos de pagos y gastos en meses pasados o futuros.
 
-> **Nota:** La numeraci贸n de versiones sigue el est谩ndar de [SemVer](https://semver.org/lang/es/): 
-> `MAYOR.MENOR.PARCHE`
+## [1.2.0] - 2026-02-02
+### A?adido
+- **Categorización de Gastos:** Clasificación de egresos (Sueldos, Alimentos, Alquiler, etc.).

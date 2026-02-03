@@ -108,7 +108,18 @@
                 </table>
                 <h3 style="margin-top:30px">Historial de Pagos</h3>
                 <table>
-                    <thead><tr><th>Residente</th><th>Monto</th><th>Fecha Registro</th><th>Acciones</th></tr></thead>
+                    <thead>
+						<tr>
+							<th onclick="renderPaymentsBy('name')" style="cursor:pointer; color: #2980b9; text-decoration: underline;">
+								Residente ↕️
+							</th>
+							<th>Monto</th>
+							<th onclick="renderPaymentsBy('date')" style="cursor:pointer; color: #2980b9; text-decoration: underline;">
+								Fecha ↕️
+							</th>
+							<th>Acciones</th>
+						</tr>
+					</thead>
                     <tbody id="paymentsHistoryBody"></tbody>
                 </table>
             </section>
@@ -129,7 +140,15 @@
                 <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
                     <div class="card">
                         <h3>Reportes PDF</h3>
-                        <button class="btn-primary" style="background:var(--dark); width: 100%;" onclick="cerrarMes()">🔒 Generar Cierre de Mes</button>
+                        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+							<div style="flex: 1; min-width: 200px;">
+								<label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #475569;">Elegir Mes de Cierre:</label>
+								<input type="month" id="reportMonthSelector" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
+							</div>
+							<button onclick="cerrarMesDesdeSelector()" class="btn-primary" style="background: #1e293b; height: 42px; align-self: flex-end; padding: 0 20px; cursor: pointer;">
+								📊 Generar Cierre PDF
+							</button>
+						</div>
                     </div>
                     <div class="card">
                         <h3>Copia de Seguridad (JSON)</h3>
@@ -279,12 +298,20 @@
         <h3>Registrar Cobro</h3><p id="payResidentName"></p>
         <input type="hidden" id="payResidentId">
         <label>Monto ($):</label><input type="text" id="payAmount" oninput="formatCurrencyInput(event)">
+		<div style="margin-bottom: 15px;">
+			<label style="display: block; margin-bottom: 5px;">Fecha del Pago:</label>
+			<input type="date" id="payDate" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+		</div>
         <div class="modal-actions"><button onclick="processPayment()" class="btn-primary">Confirmar</button><button onclick="closeModal('paymentModal')">Cancelar</button></div>
     </div></div>
 
     <div id="editPaymentModal" class="modal"><div class="modal-content">
         <h3>Editar Pago</h3><input type="hidden" id="editPayId">
         <label>Nuevo Monto ($):</label><input type="text" id="editPayAmount" oninput="formatCurrencyInput(event)">
+		<div class="form-group">
+			<label>Fecha del Pago:</label>
+			<input type="date" id="editPayDate" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;">
+		</div>
         <div class="modal-actions"><button onclick="saveEditedPayment()" class="btn-primary">Actualizar</button><button onclick="closeModal('editPaymentModal')">Cerrar</button></div>
     </div></div>
 
@@ -301,6 +328,10 @@
 			</select>
         <label>Concepto:</label><input type="text" id="expConcept">
         <label>Monto ($):</label><input type="text" id="expAmount" oninput="formatCurrencyInput(event)">
+		<div class="form-group">
+			<label>Fecha del Gasto:</label>
+			<input type="date" id="expDate" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;">
+		</div>
         <div class="modal-actions"><button onclick="saveExpense()" class="btn-primary">Guardar</button><button onclick="closeModal('expenseModal')">Cerrar</button></div>
     </div></div>
 
@@ -318,25 +349,38 @@
             document.getElementById('payResidentName').innerText = "Residente: " + name;
             openModal('paymentModal');
         }
-        async function processPayment() {
-            const ci = document.getElementById('payResidentId').value;
-            const monto = document.getElementById('payAmount').value;
-            if(!monto) return alert("Ingrese monto");
-            await addPayment(ci, monto);
-            closeModal('paymentModal');
-            refreshAllData();
-            document.getElementById('payAmount').value = "";
-        }
-        async function saveExpense() {
-            const concept = document.getElementById('expConcept').value;
-            const amount = document.getElementById('expAmount').value;
-            if(!concept || !amount) return alert("Complete datos");
-            await addExpense(concept, amount);
-            closeModal('expenseModal');
-            refreshAllData();
-            document.getElementById('expConcept').value = "";
-            document.getElementById('expAmount').value = "";
-        }
+        // Reemplaza processPayment en index.html
+async function processPayment() {
+    const ci = document.getElementById('payResidentId').value;
+    const monto = document.getElementById('payAmount').value;
+    const fecha = document.getElementById('payDate').value; // Agregado
+
+    if(!monto) return alert("Ingrese monto");
+    if(!fecha) return alert("Seleccione la fecha del pago");
+    
+    await addPayment(ci, monto, fecha); // Ahora envía 3 datos
+    closeModal('paymentModal');
+    refreshAllData();
+    document.getElementById('payAmount').value = "";
+    document.getElementById('payDate').value = "";
+}
+
+// Reemplaza saveExpense en index.html
+async function saveExpense() {
+    const concept = document.getElementById('expConcept').value;
+    const amount = document.getElementById('expAmount').value;
+    const fecha = document.getElementById('expDate').value; // Agregado
+
+    if(!concept || !amount) return alert("Complete datos");
+    if(!fecha) return alert("Seleccione la fecha del gasto");
+    
+    await addExpense(concept, amount, fecha); // Ahora envía 3 datos
+    closeModal('expenseModal');
+    refreshAllData();
+    document.getElementById('expConcept').value = "";
+    document.getElementById('expAmount').value = "";
+    document.getElementById('expDate').value = "";
+}
     </script>
 </body>
 </html>

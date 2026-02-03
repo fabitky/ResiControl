@@ -225,100 +225,115 @@ function filterResidents() {
  * FICHA RESIDENTES PARA IMPRIMIR
  */
 async function generarFichaIndividual(cedula) {
-    const { jsPDF } = window.jspdf;
-    
-    // Obtener datos del residente específico
     const residents = await getAllFromStore("residents");
     const res = residents.find(r => r.cedula === cedula);
-    
-    if (!res) return alert("Residente no encontrado.");
+    if (!res) return alert("Residente no encontrado");
 
+    const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // --- ESTILO VISUAL ---
-    doc.setFillColor(44, 62, 80); // Azul oscuro institucional
-    doc.rect(0, 0, 210, 30, 'F');
+    // Función auxiliar para calcular edad
+    const calcularEdad = (fechaNac) => {
+        if(!fechaNac) return "Sin registrar";
+        const hoy = new Date();
+        const cumple = new Date(fechaNac);
+        let edad = hoy.getFullYear() - cumple.getFullYear();
+        const m = hoy.getMonth() - cumple.getMonth();
+        if (m < 0 || (m === 0 && hoy.getDate() < cumple.getDate())) edad--;
+        return edad >= 0 ? edad + " años" : "Sin registrar";
+    };
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
+    // --- ENCABEZADO PROFESIONAL ---
+    doc.setFillColor(44, 62, 80);
+    doc.rect(0, 0, 210, 35, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.text("FICHA DEL RESIDENTE", 20, 20);
-
-    // --- INFORMACIÓN PERSONAL ---
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(14);
-    doc.text("Datos Personales", 20, 45);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, 47, 190, 47);
-
-    doc.setFontSize(11);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("FICHA INDIVIDUAL DEL RESIDENTE", 105, 18, { align: "center" });
+    doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    let y = 55;
+    doc.text("Residencial Doña Muñeca - Gestión Administrativa", 105, 26, { align: "center" });
+
+    let y = 45;
+
+    // --- FUNCIÓN PARA DIBUJAR CAJAS DE SECCIÓN ---
+    const drawSection = (title, height) => {
+        doc.setFillColor(245, 247, 250);
+        doc.rect(15, y, 180, height, 'F');
+        doc.setDrawColor(200, 205, 211);
+        doc.rect(15, y, 180, height, 'D');
+        doc.setTextColor(44, 62, 80);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text(title, 20, y + 7);
+        y += 12;
+    };
+
+    // --- 1. DATOS PERSONALES ---
+    drawSection("1. DATOS PERSONALES", 45);
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
     
-    const datos = [
-        ["Nombre Completo:", res.name],
-        ["Cédula de Identidad:", res.cedula],
-        ["Fecha de Nacimiento:", res.birthDate || "No registrada"],
-        ["Estado:", res.status || "Activo"]
-    ];
+    const labelX = 22;
+    const valueX = 65;
 
-    datos.forEach(linea => {
+    const row = (label, value, isBoldValue = false) => {
         doc.setFont("helvetica", "bold");
-        doc.text(linea[0], 20, y);
-        doc.setFont("helvetica", "normal");
-        doc.text(linea[1].toString(), 70, y);
-        y += 8;
-    });
+        doc.text(label, labelX, y);
+        doc.setFont("helvetica", isBoldValue ? "bold" : "normal");
+        doc.text(value ? String(value) : "---", valueX, y);
+        y += 6;
+    };
 
-    // --- INFORMACIÓN MÉDICA (Crucial para traslados) ---
-    y += 10;
+    row("Nombre Completo:", res.name);
+    row("C.I.:", res.cedula);
+    row("F. de Nacimiento:", res.birthDate);
+    row("Edad:", calcularEdad(res.birthDate));
+    row("Estado:", res.status);
+    
+    // --- DESTACADO: FECHA DE INGRESO ---
+    y += 2;
+    doc.setDrawColor(41, 128, 185); // Azul
+    doc.setFillColor(235, 245, 251);
+    doc.rect(20, y - 4, 100, 8, 'FD');
+    doc.setTextColor(41, 128, 185);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("Información Médica y Emergencia", 20, y);
-    doc.line(20, y + 2, 190, y + 2);
-    y += 12;
+    doc.text(`FECHA DE INGRESO: ${res.entryDate || '---'}`, 25, y + 1.5);
+    y += 15;
 
-    doc.setFontSize(11);
-    const medica = [
-        ["Mutualista:", res.mutualista || "No registrada"],
-        ["Emergencia Móvil:", res.emergencia || "No registrada"],
-        ["Observaciones/Dieta:", res.observations || "Sin observaciones"]
-    ];
-
-    medica.forEach(linea => {
-        doc.setFont("helvetica", "bold");
-        doc.text(linea[0], 20, y);
-        doc.setFont("helvetica", "normal");
-        
-        // Manejo de texto largo en observaciones
-        if (linea[0] === "Observaciones/Dieta:") {
-            const splitText = doc.splitTextToSize(linea[1], 120);
-            doc.text(splitText, 70, y);
-            y += (splitText.length * 6);
-        } else {
-            doc.text(linea[1].toString(), 70, y);
-            y += 8;
-        }
-    });
-
-    // --- CONTACTO DE FAMILIARES ---
-    y += 5;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("Contacto de Referencia", 20, y);
-    doc.line(20, y + 2, 190, y + 2);
+    // --- 2. CONTACTO FAMILIAR ---
+    drawSection("2. CONTACTO FAMILIAR DE REFERENCIA", 28);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    row("Responsable:", res.emerName);
+    row("Teléfono:", res.emerPhone);
+    row("Parentesco:", res.emerNote);
     y += 10;
 
-    doc.setFontSize(11);
+    // --- 3. EMERGENCIA MÓVIL ---
+    drawSection("3. SERVICIO DE EMERGENCIA", 22);
+    doc.setTextColor(197, 48, 48); // Rojo
+    row("Institución:", res.emergenciaNombre, true);
+    row("Teléfono Directo:", res.emergenciaTel, true);
+    y += 10;
+
+    // --- 4. HISTORIAL MÉDICO Y CUIDADOS ---
+    // Calculamos espacio para texto largo
+    const medicalText = res.medical || "No se registran cuidados especiales.";
+    const splitMedical = doc.splitTextToSize(medicalText, 165);
+    const boxHeight = (splitMedical.length * 5) + 15;
+    
+    drawSection("4. FICHA MÉDICA Y CUIDADOS ESPECIALES", boxHeight);
+    doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
-    doc.text(`Responsable: ${res.responsable || "No registrado"}`, 20, y);
-    y += 7;
-    doc.text(`Teléfono: ${res.phone || "No registrado"}`, 20, y);
+    doc.text(splitMedical, 22, y);
+    y += (splitMedical.length * 5) + 10;
 
-    // Pie de página
+    // --- PIE DE PÁGINA ---
     doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(`Ficha generada automáticamente por Residencial Doña Muñeca - ${new Date().toLocaleDateString()}`, 105, 285, { align: "center" });
+    doc.setTextColor(150, 150, 150);
+    const dateGen = new Date().toLocaleString('es-UY');
+    doc.text(`Ficha generada el ${dateGen} - Sistema Doña Muñeca`, 105, 285, { align: "center" });
 
-    doc.save(`Ficha_${res.name.replace(/ /g, "_")}.pdf`);
+    doc.save(`Ficha_${res.name.replace(/\s+/g, '_')}.pdf`);
 }

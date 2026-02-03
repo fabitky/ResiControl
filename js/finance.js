@@ -112,14 +112,16 @@ function checkBirthdays(residents) {
 /**
  * GENERACIÓN DE REPORTE PDF (CIERRE DE MES DETALLADO) - ESTILO PROFESIONAL
  */
-async function cerrarMes() {
+async function cerrarMes(forcedMonth = null) {
     const { jsPDF } = window.jspdf;
     if (!jsPDF) return alert("Librería jsPDF no cargada.");
 
     const doc = new jsPDF();
-    const monthKey = new Date().toISOString().slice(0, 7);
     
-    // Obtención de datos
+    // CAMBIO AQUÍ: Si viene un mes del selector lo usa, sino usa el mes actual
+    const monthKey = forcedMonth || new Date().toISOString().slice(0, 7);
+    
+    // Obtención de datos filtrados por el mes elegido
     const residents = await getAllFromStore("residents");
     const payments = (await getAllFromStore("payments")).filter(p => p.date === monthKey);
     const expenses = (await getAllFromStore("expenses")).filter(e => e.date === monthKey);
@@ -127,17 +129,17 @@ async function cerrarMes() {
     // --- ENCABEZADO ---
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
-    doc.setTextColor(30, 41, 59); // Gris oscuro azulado
+    doc.setTextColor(30, 41, 59); 
     doc.text("RESIDENCIAL DOÑA MUÑECA", 20, 25);
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139); // Gris suave
+    doc.setTextColor(100, 116, 139); 
     doc.text(`REPORTE DE CIERRE MENSUAL: ${monthKey}`, 20, 32);
     doc.setDrawColor(200, 200, 200);
     doc.line(20, 38, 190, 38);
 
-    // --- RESUMEN GENERAL (Cuadro destacado) ---
+    // --- RESUMEN GENERAL ---
     const totalIn = payments.reduce((s, p) => s + Number(p.amount), 0);
     const totalEx = expenses.reduce((s, e) => s + Number(e.amount), 0);
     const balance = totalIn - totalEx;
@@ -157,19 +159,17 @@ async function cerrarMes() {
     doc.text(`$ ${totalIn.toLocaleString('es-UY')}`, 30, 62);
     doc.text(`$ ${totalEx.toLocaleString('es-UY')}`, 85, 62);
     
-    // Color dinámico para el balance
-    if(balance >= 0) doc.setTextColor(39, 174, 96); // Verde
-    else doc.setTextColor(192, 57, 43); // Rojo
+    if(balance >= 0) doc.setTextColor(39, 174, 96);
+    else doc.setTextColor(192, 57, 43); 
     doc.text(`$ ${balance.toLocaleString('es-UY')}`, 140, 62);
 
     let y = 85;
 
-    // --- SECCIÓN DE INGRESOS DETALLADOS ---
+    // --- SECCIÓN DE INGRESOS ---
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(30, 41, 59);
     doc.text("DETALLE DE INGRESOS (COBROS)", 20, y);
-    doc.setLineWidth(0.5);
     doc.line(20, y + 2, 85, y + 2);
     y += 12;
     
@@ -184,11 +184,8 @@ async function cerrarMes() {
         payments.forEach(p => {
             const res = residents.find(r => r.cedula === p.residentCedula);
             const nombre = res ? res.name : "Residente desconocido";
-            
             doc.text(`• ${nombre}`, 25, y);
             doc.text(`$ ${Number(p.amount).toLocaleString('es-UY')}`, 185, y, { align: "right" });
-            
-            doc.setDrawColor(240, 240, 240);
             doc.line(25, y + 2, 185, y + 2);
             y += 8;
             if (y > 275) { doc.addPage(); y = 20; }
@@ -197,7 +194,7 @@ async function cerrarMes() {
 
     y += 12; 
 
-    // --- SECCIÓN DE GASTOS DETALLADOS ---
+    // --- SECCIÓN DE GASTOS ---
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(30, 41, 59);
@@ -205,30 +202,22 @@ async function cerrarMes() {
     doc.line(20, y + 2, 85, y + 2);
     y += 7;
 
-    doc.setFont("helvetica", "normal");
     if (expenses.length === 0) {
+        doc.setFont("helvetica", "normal");
         doc.text("- No se registraron gastos en este periodo.", 25, y);
     } else {
-        // Ordenamos los gastos por categoría para que queden agrupados
-        expenses.sort((a, b) => a.category.localeCompare(b.category));
-
+        expenses.sort((a, b) => (a.category || "").localeCompare(b.category || ""));
         expenses.forEach(e => {
             doc.setFont("helvetica", "normal");
-            doc.text(`[${e.category || 'Otros'}]`, 25, y); // Muestra la categoría
-            
-            doc.setFont("helvetica", "normal");
-            doc.text(`${e.concept}`, 65, y); // Muestra el concepto más corrido
-            
+            doc.text(`[${e.category || 'Otros'}]`, 25, y);
+            doc.text(`${e.concept}`, 65, y);
             doc.text(`$ ${Number(e.amount).toLocaleString('es-UY')}`, 185, y, { align: "right" });
-            
-            doc.setDrawColor(240, 240, 240);
             doc.line(25, y + 2, 185, y + 2);
             y += 8;
             if (y > 275) { doc.addPage(); y = 20; }
         });
     }
 
-    // Pie de página
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.text(`Sistema de Gestión Doña Muñeca - Generado el ${new Date().toLocaleString()}`, 105, 285, { align: "center" });
@@ -239,64 +228,78 @@ async function cerrarMes() {
 /**
  * GUARDADO DE DATOS (CON LIMPIEZA DE FORMATO MONEDA)
  */
-async function addPayment(residentCedula, amount) {
+async function addPayment(residentCedula, amount, selectedDate) {
     const cleanAmount = parseFloat(amount.toString().replace(/\./g, ""));
     if(isNaN(cleanAmount)) return;
+    
+    // Extrae el mes de la fecha elegida (ej: "2023-05")
+    const monthKey = selectedDate.slice(0, 7); 
     
     const tx = db.transaction(["payments"], "readwrite");
     const store = tx.objectStore("payments");
-    const request = store.add({
-        residentCedula,
-        amount: cleanAmount,
-        date: new Date().toISOString().slice(0, 7),
-        timestamp: Date.now()
+    const request = store.add({ 
+        residentCedula, 
+        amount: cleanAmount, 
+        date: monthKey, // USAMOS LA FECHA ELEGIDA
+        fullDate: selectedDate,
+        timestamp: Date.now() 
     });
-    
     return new Promise((res) => request.onsuccess = () => res());
 }
 
-async function addExpense(concept, amount) {
+async function addExpense(concept, amount, selectedDate) {
     const cleanAmount = parseFloat(amount.toString().replace(/\./g, ""));
-    const category = document.getElementById('expenseCategory').value; // Capturamos la categoría
-    
+    const category = document.getElementById('expenseCategory').value;
     if(isNaN(cleanAmount)) return;
-
+    
+    const monthKey = selectedDate.slice(0, 7);
+    
     const tx = db.transaction(["expenses"], "readwrite");
     const store = tx.objectStore("expenses");
-    const request = store.add({
-        concept,
-        amount: cleanAmount,
-        category: category, // Guardamos la categoría
-        date: new Date().toISOString().slice(0, 7),
-        timestamp: Date.now()
+    const request = store.add({ 
+        concept, 
+        amount: cleanAmount, 
+        category: category, 
+        date: monthKey, // USAMOS LA FECHA ELEGIDA
+        fullDate: selectedDate,
+        timestamp: Date.now() 
     });
-    
     return new Promise((res) => request.onsuccess = () => res());
 }
 
 /**
  * EDICIÓN DE PAGOS
  */
-function editPayment(id, amt) {
+function editPayment(id, amt, date) {
     document.getElementById('editPayId').value = id;
-    // Mostramos el monto con puntos en el modal
     document.getElementById('editPayAmount').value = new Intl.NumberFormat('es-UY').format(amt);
+    document.getElementById('editPayDate').value = date; // Carga la fecha guardada
     openModal('editPaymentModal');
 }
 
 async function saveEditedPayment() {
     const id = Number(document.getElementById('editPayId').value);
     const amtRaw = document.getElementById('editPayAmount').value;
+    const newDate = document.getElementById('editPayDate').value;
     const cleanAmount = parseFloat(amtRaw.toString().replace(/\./g, ""));
+
+    if(!newDate) return alert("Seleccione una fecha");
 
     const tx = db.transaction(["payments"], "readwrite");
     const store = tx.objectStore("payments");
+    
     store.get(id).onsuccess = (e) => {
         const data = e.target.result;
         data.amount = cleanAmount;
+        data.fullDate = newDate;
+        data.date = newDate.slice(0, 7); // Actualiza también el mes para el gráfico
         store.put(data);
     };
-    tx.oncomplete = () => { closeModal('editPaymentModal'); refreshAllData(); };
+    
+    tx.oncomplete = () => { 
+        closeModal('editPaymentModal'); 
+        refreshAllData(); 
+    };
 }
 
 /**
@@ -323,28 +326,56 @@ function renderDebtors(active, payments, month) {
     const list = document.getElementById('debtorsBody');
     if (!list) return;
     list.innerHTML = "";
+    
     active.forEach(res => {
+        // Buscamos si existe un pago para este residente en el mes consultado
         const paid = payments.find(p => p.residentCedula === res.cedula && p.date === month);
-        list.innerHTML += `<tr>
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
             <td><b>${res.name}</b><br><small>CI: ${res.cedula}</small></td>
-            <td><span class="${paid ? 'bg-success' : 'bg-danger'}">${paid ? 'PAGADO' : 'PENDIENTE'}</span></td>
-            <td>${paid ? '---' : `<button onclick="openPaymentModal('${res.cedula}','${res.name}')">Cobrar</button>`}</td>
-        </tr>`;
+            <td>
+                <span class="status-badge" style="background-color: ${paid ? '#27ae60' : '#e67e22'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">
+                    ${paid ? 'AL DÍA' : 'PENDIENTE'}
+                </span>
+            </td>
+            <td style="text-align:center">
+                <button class="btn-pay" onclick="openPaymentModal('${res.cedula}','${res.name}')" style="cursor:pointer; padding: 5px 10px;">
+                    💰 Cobrar
+                </button>
+            </td>
+        `;
+        list.appendChild(row);
     });
 }
 
-function renderPaymentsHistory(payments, residents) {
+function renderPaymentsHistory(payments, residents, sortBy = 'date') {
     const list = document.getElementById('paymentsHistoryBody');
     if (!list) return;
     list.innerHTML = "";
-    [...payments].sort((a,b) => b.timestamp - a.timestamp).slice(0,15).forEach(p => {
+
+    let sortedPayments = [...payments];
+
+    // Lógica de ordenamiento
+    if (sortBy === 'name') {
+        sortedPayments.sort((a, b) => {
+            const nameA = residents.find(r => r.cedula === a.residentCedula)?.name || "";
+            const nameB = residents.find(r => r.cedula === b.residentCedula)?.name || "";
+            return nameA.localeCompare(nameB);
+        });
+    } else {
+        // Por defecto ordena por fecha (timestamp) de más reciente a más antiguo
+        sortedPayments.sort((a, b) => b.timestamp - a.timestamp);
+    }
+
+    sortedPayments.slice(0, 20).forEach(p => {
         const r = residents.find(res => res.cedula === p.residentCedula);
         list.innerHTML += `<tr>
             <td>${r ? r.name : 'Desconocido'}</td>
             <td>$ ${p.amount.toLocaleString('es-UY')}</td>
-            <td>${p.date}</td>
+            <td>${p.fullDate || p.date}</td>
             <td>
-                <button onclick="editPayment(${p.id},${p.amount})">✏️</button>
+                <button onclick="editPayment(${p.id}, ${p.amount}, '${p.fullDate || ''}')">✏️</button>
                 <button onclick="deletePayment(${p.id})" style="color:red">🗑️</button>
             </td>
         </tr>`;
@@ -402,38 +433,78 @@ function prepareSemesterChart(payments, expenses) {
 /**
  * COPIAS DE SEGURIDAD (BACKUP JSON)
  */
+// --- FUNCIÓN DE EXPORTACIÓN CORREGIDA ---
 async function exportBackupJSON() {
-    const data = {
-        residents: await getAllFromStore("residents"),
-        payments: await getAllFromStore("payments"),
-        expenses: await getAllFromStore("expenses")
+    const residents = await getAllFromStore("residents");
+    const payments = await getAllFromStore("payments");
+    const expenses = await getAllFromStore("expenses"); // Agregado para que no se pierdan
+
+    const backupData = {
+        residents,
+        payments,
+        expenses, // Incluimos los gastos en el archivo
+        version: "1.6.0",
+        date: new Date().toISOString()
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `Backup_DonaMuneca_${new Date().toISOString().slice(0,10)}.json`;
+
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `backup_residencia_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
+    URL.revokeObjectURL(url);
 }
 
-function importBackupJSON(event) {
+// --- FUNCIÓN DE IMPORTACIÓN CORREGIDA ---
+async function importBackupJSON(event) {
     const file = event.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
             const data = JSON.parse(e.target.result);
-            if (!confirm("Se sobreescribirán todos los datos. ¿Continuar?")) return;
-            const tx = db.transaction(["residents", "payments", "expenses"], "readwrite");
-            tx.objectStore("residents").clear();
-            tx.objectStore("payments").clear();
-            tx.objectStore("expenses").clear();
-            data.residents.forEach(r => tx.objectStore("residents").add(r));
-            data.payments.forEach(p => tx.objectStore("payments").add(p));
-            data.expenses.forEach(ex => tx.objectStore("expenses").add(ex));
-            tx.oncomplete = () => window.location.reload();
-        } catch(err) { alert("Archivo de backup inválido."); }
+            
+            // Verificación básica de que el archivo es válido
+            if (!data.residents || !data.payments) {
+                return alert("Error: El archivo no parece ser un backup válido.");
+            }
+
+            if (!confirm("Se eliminarán todos los datos actuales y se cargarán los del backup. ¿Deseas continuar?")) return;
+
+            // Limpiamos y cargamos las 3 tablas (incluyendo gastos si existen en el backup)
+            await clearAndFillStore("residents", data.residents);
+            await clearAndFillStore("payments", data.payments);
+            
+            if (data.expenses) {
+                await clearAndFillStore("expenses", data.expenses);
+            }
+
+            alert("Respaldo cargado con éxito. La aplicación se reiniciará.");
+            location.reload();
+        } catch (err) {
+            console.error(err);
+            alert("Hubo un error al procesar el archivo JSON.");
+        }
     };
     reader.readAsText(file);
+}
+
+// --- FUNCIÓN AUXILIAR (Asegúrate de tenerla) ---
+async function clearAndFillStore(storeName, items) {
+    const tx = db.transaction([storeName], "readwrite");
+    const store = tx.objectStore(storeName);
+    await store.clear();
+    for (const item of items) {
+        // Importante: Borramos el ID antiguo para que la base de datos genere nuevos 
+        // y no haya conflictos de llaves primarias
+        if (item.id) delete item.id;
+        await store.add(item);
+    }
+    return new Promise((resolve) => {
+        tx.oncomplete = () => resolve();
+    });
 }
 
 /**
@@ -458,4 +529,34 @@ function getAllFromStore(name) {
         const tx = db.transaction([name], "readonly");
         tx.objectStore(name).getAll().onsuccess = (e) => res(e.target.result);
     });
+}
+async function renderPaymentsBy(criteria) {
+    const residents = await getAllFromStore("residents");
+    const payments = await getAllFromStore("payments");
+    renderPaymentsHistory(payments, residents, criteria);
+}
+/**
+ * Captura el mes del selector y dispara la generación del PDF
+ */
+async function generateMonthlyReportFromSelector() {
+    const selector = document.getElementById('reportMonthSelector');
+    if (!selector.value) {
+        return alert("Por favor, selecciona un mes y año para generar el reporte.");
+    }
+    
+    // El formato de input 'month' es YYYY-MM, justo lo que necesitamos
+    const selectedMonth = selector.value; 
+    
+    // Llamamos a la función existente pero pasándole el mes elegido
+    await generateMonthlyReport(selectedMonth);
+}
+async function cerrarMesDesdeSelector() {
+    const selector = document.getElementById('reportMonthSelector');
+    
+    if (!selector.value) {
+        return alert("Por favor, selecciona un mes en el calendario.");
+    }
+
+    // selector.value nos da el formato "2024-03" automáticamente
+    await cerrarMes(selector.value);
 }
